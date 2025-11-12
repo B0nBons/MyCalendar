@@ -32,16 +32,31 @@ class Model:
 
     def add_task(self, task): # NOTE: MAKE THIS SAFE FROM COMMAND INJECTION. THIS IS UNSAFE
         if task != "":
+            task = task.strip()
             self.tasks.append(task)
 
     def remove_task(self, index):
         if index >= 0 and index < len(self.tasks):
-            del self.tasks[index] # NOTE: Make it so the user can actually use a checklist
+            del self.tasks[index] # NOTE: Make it so the user can actually use a CHECKLIST.
                                   # NOTE: And their tasks aren't deleted off the face of earth
+                
+    def change_colour_theme(self, req = 1):
+        theme1 = {'bg' :'lightblue', 
+                  'fg' : 'darkblue'}
+        theme2 = {"bg" : 'honeydew2',
+                  'fg' : 'SlateBlue4'}
+        theme3 = {"bg" : 'LightPink1', 
+                  'fg' : 'firebrick4'}
+        if req == 1:
+            return theme1
+        elif req == 2:
+            return theme2
+        else:
+            return theme3
 
     class Database: # Make this a standalone class maybe? Works fine so maybe not
         def __init__(self):
-            self.filename = "data.csv" # CAN CHANGE THIS TO data.TXT instead
+            self.filename = "data.csv" # CAN CHANGE THIS TO DATA.TXT instead
 
         def check_data_path(self):
             return os.path.exists(self.filename)
@@ -56,7 +71,7 @@ class Model:
                             tasks.append(line)
             return tasks
 
-        def save_tasklist(self, tasks): # Maybe change this to append instead(?)
-            with open(self.filename, "w") as file:
+        def save_tasklist(self, tasks): 
+            with open(self.filename, "w") as file:  # Maybe change this to append instead(?)
                 for task in tasks:
                     file.write(task + "\n")
