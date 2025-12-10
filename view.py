@@ -1,67 +1,142 @@
-import tkinter as tk
-from tkcalendar import Calendar, DateEntry
-from datetime import date
-# Import needed libraries
+# view.py
+from nicegui import ui
+from datetime import date, timedelta
 
 class View:
-    def __init__(self, root): # Define method with __ to ensure 'pythonic' language idk read too many articles
-        self.root = root
-        self.root.configure(background = "ivory")
+    def __init__(self):
+        self.root_container = ui.column()
+        
+        self.login_user_input = None
+        self.login_pass_input = None
+        self.register_button = None
+        self.login_button = None
+        self.login_message_label = None
 
-        self.root.title("Test123's Tasks") # CHANGE THIS TO AN OFFICIAL NAME
-        # Name of application window
+        self.date_picker = None
+        self.task_input = None
+        self.add_button = None
+        self.refresh_button = None
+        self.week_container = None
+        self.tasks_column = None
+        self.checkbox_callback = None
+        
+        self.share_task_dropdown = None
+        self.share_user_dropdown = None
+        self.share_button = None
+        self.share_message_label = None
+        # nicegui needs to hold the areas for the UI
+        # This way there won't be any gross formatting and overlap
 
-        self.month_label = tk.Label(root, text="Month: ")
-        self.month_label.pack()
-        # Month label for top
-        # Overall, somewhat useless seeing as their is no physical calendar
+    def login_page(self):
+        self.root_container.clear()
+        with self.root_container:
+            ui.label('Task Calendar').classes('text-3xl font-bold mb-4')
+            ui.label('Register or Login')
+            
+            with ui.card().classes('w-96 p-4'):
+                self.login_user_input = ui.input(label='Username').classes('w-full')
+                self.login_pass_input = ui.input(label='Password', password=True).classes('w-full')
+                
+                with ui.row().classes('mt-4'):
+                    self.register_button = ui.button('Register').props('color=purple-7')
+                    self.login_button = ui.button('Login').props('color=purple-7')
+                
+                self.login_message_label = ui.label('').classes('mt-2 text-red-500')
 
-        self.task_entry = tk.Entry(root)
-        self.task_entry.pack()
-        # This is the field that lets the user type in tasks
-        # It looks ugly. 
+# Above is for login and auth, below is for app
+    
+    def app_page(self):
+        self.root_container.clear()
+        with self.root_container:
+            ui.label('Task Calendar').classes('text-3xl font-bold mb-4')
 
-        self.add_button = tk.Button(root, text="Add Task")
-        self.add_button.pack()
-        # Add task
+            with ui.card().classes('w-full p-4 mb-4'):
+                ui.label('Add Task').classes('text-lg font-medium mb-2')
+                with ui.row().classes('items-end gap-4'):
+                    self.date_picker = ui.date(value=date.today()).classes('w-48')
+                    # We define date_picker to initally have todays date
+                    self.task_input = ui.input(label='Task').classes('w-64')
+                    self.add_button = ui.button('Add').props('color=purple-7')
+                    self.refresh_button = ui.button('Refresh').props('color=purple-7')
 
-        self.remove_button = tk.Button(root, text="Remove Selected")
-        self.remove_button.pack()
-        # Remove task (you need to click on the task, then select to remove it)
+            with ui.card().classes('w-full p-4 mb-4'):
+                ui.label('Share Task').classes('text-lg font-medium mb-2')
+                with ui.row().classes('items-end gap-4'):
+                    self.share_task_dropdown = ui.select({}, label='Your Task').classes('w-64')
+                    self.share_user_dropdown = ui.select([], label='Share With').classes('w-48')
+                    self.share_button = ui.button('Share').props('color=purple-7')
+                self.share_message_label = ui.label('').classes('mt-2')
 
-        self.save_button = tk.Button(root, text="Save Tasks")
-        self.save_button.pack()
-        # Save tasks by writing to csv
+            ui.separator()
+            ui.label('Next 7 Days').classes('text-xl font-bold mt-4 mb-2')
+            self.week_container = ui.column().classes('w-full')
 
-        self.load_button = tk.Button(root, text="Load Tasks")
-        self.load_button.pack()
-        # Load tasks from csv NOTE: can use txt, csv isnt needed
-        # NOTE: DOES NOT SAVE UNSAVED TASKS ON EXIT OF PROGRAM
+            ui.separator()
+            ui.label('Tasks for Selected Day').classes('text-xl font-bold mt-4 mb-2')
+            self.tasks_column = ui.column().classes('w-full p-2')
 
-        self.change_col_button = tk.Button(root, text = "Change Theme")
-        self.change_col_button.pack()
-        # IDK IF THIS WORKS
+    def set_login_message(self, text):
+        if self.login_message_label:
+            self.login_message_label.text = text
 
-        self.task_listbox = tk.Listbox(root, width=50)
-        self.task_listbox.pack(pady=20) # Change padding later
+    def set_share_message(self, text):
+        if self.share_message_label:
+            self.share_message_label.text = text
 
-        self.prev_button = tk.Button(root, text="<-- Previous Month")
-        self.prev_button.pack(side="left", padx=10)
-        # This isnt really used yet
+    def clear_week(self):
+        if self.week_container:
+            self.week_container.clear()
 
-        self.next_button = tk.Button(root, text="Next Month -->")
-        self.next_button.pack(side="right", padx=10)
-        # This still isnt used yet
+    def clear_tasks(self):
+        if self.tasks_column:
+            self.tasks_column.clear()
 
-        self.calendar = Calendar(root,
-                                 font = "Arial 12",
-                                 selectmode = 'day'
-                                 locale = 'en_us'
-                                 cursor = 'hand1'
-                                 year = date.today().year,
-                                 month = date.today().month,
-                                 day = date.today().day)
-
-
-# NOTE: Last two methods need to be implemented into an actual calendar view
-# NOTE: They both do nothing for now
+    def draw_next_seven_days(self, tasks, call):
+        self.clear_week()
+        
+        with self.week_container:
+            with ui.row().classes('gap-2 flex-wrap'):
+                today = date.today()
+                for i in range(7):
+                    day = today + timedelta(days=i)
+                    day_str = day.strftime('%Y-%m-%d')
+                    
+                    day_tasks = []
+                    for t in tasks:
+                        if t['date'] == day_str:
+                            day_tasks.append(t)
+                    
+                    if i == 0:
+                        label = 'Today'
+                    elif i == 1:
+                        label = 'Tomorrow'
+                    else:
+                        label = day.strftime('%A')
+                        # Had to google date formatting
+                    
+                    with ui.card().classes('w-48 min-h-32'):
+                        ui.label(label).classes('font-bold')
+                        ui.label(day_str).classes('text-sm text-gray-500')
+                        ui.label(str(len(day_tasks)) + ' task(s)').classes('text-sm')
+                        
+                        if len(day_tasks) > 0:
+                            with ui.column().classes('mt-2'):
+                                for t in day_tasks:
+                                    with ui.row().classes('items-center'):
+                                        cb = ui.checkbox(value=t['completed']).classes('text-sm')
+                                        cb.on('update:model-value', lambda e, task_id=t['id']: call(task_id))
+                                        # We again use lambda, since defining a func
+                                        # For this task would be inefficient
+                                        
+                                        text = t['text']
+                                        if len(text) > 18:
+                                            text = text[:18] + '...'
+                                            # Cut text that it too long for box
+                                        if t['is_shared']:
+                                            text = text + ' [' + t['owner'] + ']'
+                                        
+                                        style = 'text-sm'
+                                        if t['completed']:
+                                            style = 'text-sm line-through'
+                                        
+                                        ui.label(text).classes(style)
