@@ -1,88 +1,165 @@
-import datetime as dt 
-import random
-import tkinter as tk
+from model import Model
+from view import View
+from datetime import datetime, date
+from nicegui import ui
 # Import libraries
+# We do import nicegui here
+# NOTE: I JUST NOTICED THAT ALL THE DATES SEEM TO BE AHEAD BY ONE FOR SOME REASON
+# NOTE: ^ Seems that it's due to VPN. Check later
 
 class Controller:
-    def __init__(self, model, view, root):
+    def __init__(self, model, view):
         self.model = model
         self.view = view
-        self.root = root
+        # Init View and Model
+        
+        self.view.login_page()
+        self.view.register_button.on_click(self.handle_register)
+        self.view.login_button.on_click(self.handle_login)
+        # Display login page and require auth
 
-        # Set initial month label
-        self.update_month_label()
+    def handle_register(self):
+        username = self.view.login_user_input.value
+        password = self.view.login_pass_input.value
+        ok, msg = self.model.register(username, password)
+        self.view.set_login_message(msg)
+        # If user presses register, show a label that either confirms or disallows user to continue
 
-        # Add buttons from view
-        self.view.add_button.config(command = self.add_task)
-        self.view.remove_button.config(command = self.remove_task)
-        self.view.save_button.config(command = self.save_tasks)
-        self.view.load_button.config(command = self.load_tasks)
-        self.view.next_button.config(command = self.next_month)
-        self.view.prev_button.config(command = self.prev_month)
-        self.view.change_col_button.config(command = self.change_col)
+    def handle_login(self):
+        username = self.view.login_user_input.value
+        password = self.view.login_pass_input.value
+        ok, msg = self.model.login(username, password)
+        self.view.set_login_message(msg)
+        if ok:
+            self.show_app_page()
+        # If login works, then it shows the actual todo list/calendar 
 
-    def update_month_label(self): # This is literally useless right now
-        month_name = dt.date(1900, self.model.current_month, 1).strftime('%B') # google said %B returns whole month name
-        month_label = "Month: " + month_name + " " + str(self.model.current_year)
-        self.view.month_label.config(text=month_label)
-        # Only use if it has a visual calendar with tasks that change by month
-        # Or a cool feature like that bc this is stupid why did i even do this
+    def show_app_page(self):
+        self.view.app_page()
+        self.view.add_button.on_click(self.handle_add_task)
+        self.view.refresh_button.on_click(self.handle_refresh)
+        self.view.share_button.on_click(self.handle_share)
+        self.view.checkbox_togg = self.handle_toggle
+        self.view.date_picker.on('update:model-value', self.handle_date_change)
+        self.refresh_all()
+        # Refresh everything
 
-    def add_task(self):
-        task = self.view.task_entry.get()
-        self.model.add_task(task)
-        self.view.task_entry.delete(0, 'end')
-        self.refresh_tasklist()
-
-    def remove_task(self):
-        # User needs to click on the task they want to remove then click remove
-        click = self.view.task_listbox.curselection()
-        if click:
-            index = click[0]
-            self.model.remove_task(index)
-            self.refresh_tasklist()
-
-    def save_tasks(self):
-        self.model.db.save_tasklist(self.model.tasks)
-
-    def load_tasks(self):
-        self.model.tasks = self.model.db.load_tasklist()
-        self.refresh_tasklist()
-
-    def next_month(self):
-        self.model.monthDOWN()
-        self.update_month_label()
-
-    def prev_month(self):
-        self.model.monthUP()
-        self.update_month_label()
-    
-    def change_col(self):
-        theme_num = random.randint(1,3)
-        theme = self.model.change_colour_theme(theme_num)
-        if theme_num == 1:    
-            self.root.configure(background='lightblue')
-            self.view.task_listbox.configure(bg = "mint cream", fg = "darkblue")
-
-        elif theme_num == 2:
-            self.root.configure(background = "honeydew2")
-            self.view.task_listbox.configure(bg = "pale turquoise", fg = "SlateBlue4")
-
+    def handle_add_task(self):
+        text = self.view.task_input.value
+        picked = self.view.date_picker.value
+        if type(picked) is date:
+            date_str = picked.strftime('%Y-%m-%d')
         else:
-            self.root.configure(background = "LightPink1")
-            self.view.task_listbox.configure(bg = "plum1", fg = "firebrick4")
+            try:
+                parsed = datetime.strptime(str(picked), '%Y-%m-%d').date()
+                date_str = parsed.strftime('%Y-%m-%d')
+            except:
+                # Again, all errors need to be ignored (though there shouldn't be any,
+                # since NiceGUI's datepicker element returns datetype object)
+                date_str = date.today().strftime('%Y-%m-%d')
+        
+        ok, msg = self.model.add_task(text, date_str)
+        if ok:
+            self.view.task_input.value = ''
+            self.refresh_all()
 
-        self.view.month_label.configure(**theme)
-        self.view.task_entry.configure(**theme)
-        self.view.add_button.configure(**theme)
-        self.view.remove_button.configure(**theme)
-        self.view.save_button.configure(**theme)
-        self.view.load_button.configure(**theme)
-        self.view.change_col_button.configure(**theme)
-        self.view.prev_button.configure(**theme)
-        self.view.next_button.configure(**theme)
+    def handle_refresh(self):
+        # Changes the "tasks for selected day" label
+        self.refresh_all()
 
-    def refresh_tasklist(self):
-        self.view.task_listbox.delete(0, 'end')
-        for t in self.model.tasks:
-            self.view.task_listbox.insert('end', t)
+    def handle_date_change(self, go):
+        self.draw_selected_day(go.args)
+
+    def handle_toggle(self, task_id):
+        # Check or uncheck task
+        self.model.toggle_task(task_id)
+        self.refresh_all()
+
+    def handle_share(self):
+        task_val = self.view.share_task_dropdown.value
+        user_val = self.view.share_user_dropdown.value
+        
+        if not task_val or not user_val:
+            self.view.set_share_message('Select a task and a user')
+            return
+        
+        try:
+            task_id = int(task_val)
+        except:
+            self.view.set_share_message('Invalid task')
+            return
+        # Should never run. Failsafe
+
+        ok, msg = self.model.share_task(task_id, user_val)
+        self.view.set_share_message(msg)
+        if ok:
+            self.refresh_all()
+
+    def refresh_all(self):
+        tasks = self.model.get_tasks()
+        self.draw_week(tasks)
+        
+        pick = self.view.date_picker.value
+        if type(pick) is date:
+            date_str = pick.strftime('%Y-%m-%d')
+        else:
+            if pick != "" :
+                date_str = str(pick)
+            else:
+                # Should never run
+                date_str = date.today().strftime('%Y-%m-%d')
+
+        
+        self.draw_selected_day(date_str, tasks)
+        self.update_dropdowns()
+
+    def update_dropdowns(self):
+        users = self.model.get_all_users()
+        self.view.share_user_dropdown.options = users
+        self.view.share_user_dropdown.update()
+        
+        my_tasks = self.model.fetch_tasks_to_share()
+        options = {}
+        for task in my_tasks:
+            options[str(task['id'])] = (task['date'] + ': ' + task['text'][:25])
+            # Very ugly in code. We need this for the date, and to cut off long text
+        self.view.share_task_dropdown.options = options
+        self.view.share_task_dropdown.update()
+
+    def draw_week(self, tasks):
+        self.view.draw_next_seven_days(tasks, self.handle_toggle)
+
+    def draw_selected_day(self, selected_date, tasks=None):
+        if tasks is None:
+            tasks = self.model.get_tasks()
+        self.view.clear_tasks()
+        
+        if type(selected_date) is date:
+            date_str = selected_date.strftime('%Y-%m-%d')
+        else:
+            try:
+                cleaned = datetime.strptime(str(selected_date), '%Y-%m-%d').date()
+                date_str = cleaned.strftime('%Y-%m-%d')
+            except:
+                date_str = date.today().strftime('%Y-%m-%d')
+                
+        found = False
+        for task in tasks:
+            if task['date'] == date_str:
+                found = True
+                
+                done_text = 'Done' if task['completed'] else 'Pending'
+                shared_text = ''
+                if task['is_shared']:
+                    shared_text = ' [from ' + task['owner'] + ']'
+                
+                with self.view.tasks_column:
+                    with ui.row().classes('items-center'):
+                        check = ui.checkbox(value=task['completed'])
+                        check.on('update:model-value', lambda checkbox, task_id=task['id']: self.handle_toggle(task_id)) 
+                        # We have to use lambda since it wants a function. Won't work otherwise
+                        ui.label(task['text'] + shared_text + ' [' + done_text + ']')
+        
+        if not found:
+            with self.view.tasks_column:
+                ui.label('No tasks for this day')
