@@ -71,6 +71,13 @@ class Model:
         
         if username == '' or password == '':
             return False, 'Username and password required'
+        if len(password) < 8:
+            return False, "Password too short"
+        if len(username) < 10:
+            return False, "Username too short"
+        if "password" in password or "abc" in password.lower() or "123" in password:
+            return False, "Password insecure"
+        
 
         with open(user_list_file, "r", newline = "") as f:
             reader = csv.reader(f)
